@@ -1,0 +1,2 @@
+Date Finished,Name,Current Val,Best Val,Save Directory
+04-27-23_13:23:07, cifar100_5t_csi_b50~set=RandSplitCIFAR100_B50~task=0, 0.2018, 0.3042, logs/cifar100_5t_b50csi/cifar100_5t_csi_b50

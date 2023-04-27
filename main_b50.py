@@ -3,7 +3,7 @@ import pathlib
 import random
 import numpy as np
 import math
-
+import os
 import torch
 import torch.nn as nn
 import torch.optim as optim
@@ -83,6 +83,7 @@ def main():
                       '\n\n')
 
     args.logger.print(args)
+    args.logger.print("pid:{}".format(os.getpid()))
 
     data_loader = getattr(data, args.set)()
 
@@ -136,6 +137,7 @@ def main():
                     ),
                 )
                 args.logger.print(f"Set sparsity of {n} to {m.sparsity}")
+
     # Put the model on the GPU,
     model = utils.set_gpu(model)
 
@@ -155,7 +157,7 @@ def main():
 
     args.logger.print(f"=> Using trainer {trainer}") # FOR SPLITCIFAR100, DEFAULT.PY IS USED
 
-    train, test = trainer.train, trainer.test
+    train, test = trainer.train_b50, trainer.test
 
     # Initialize model specific context (editorial note: avoids polluting main file)
     if hasattr(trainer, "init"): # I THINK, FOR DEFAULT.PY, NOTHING HAPPENS FOR 'INIT'
@@ -197,7 +199,8 @@ def main():
                     }
                     model_dict.update(pretrained_dict)
                     model.load_state_dict(pretrained_dict)
-
+        #complement code to achieve: load model 0 parameters, except mask
+        #to finish
         now = datetime.now()
         args.logger.print(now.strftime("%d/%m/%Y %H:%M:%S"), end=' | ')
         args.logger.print(f"Task {args.set}: {idx}")
@@ -341,7 +344,18 @@ def main():
                     and len(data_loader.train_loader) * epoch > args.iter_lim
                 ):
                     break
-
+                if epoch % 200 == 0:
+                    torch.save(
+                        {
+                            "epoch": args.epochs,
+                            "arch": args.model,
+                            "state_dict": model.state_dict(),
+                            "best_acc1": best_acc1,
+                            "curr_acc1": curr_acc1,
+                            "args": args,
+                        },
+                        run_base_dir / "result_{}_epoch_{}.pt".format(idx, epoch),
+                    )
         if args.save:
             torch.save(
                 {
@@ -372,7 +386,7 @@ def main():
 
         # Joint classifier training
         if args.ood_method == 'csi':
-            train_joint = trainer.train_joint
+            train_joint = trainer.train_joint_b50
 
             # Train joint linear
             joint_linear = model.module.joint_distribution_layer
@@ -390,7 +404,7 @@ def main():
                 for epoch in range(args.joint_epochs):
                     model.train()
                     train_joint(model, joint_linear, criterion, joint_linear_optim,
-                                joint_scheduler, data_loader.train_loader, simclr_aug)
+                                joint_scheduler, data_loader.train_loader, simclr_aug, idx)
                     joint_scheduler.step()
 
                 curr_acc1_joint[idx] = test(

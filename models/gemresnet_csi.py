@@ -83,3 +83,11 @@ def GEMResNet18CSI():
         return RN(BasicBlock, [2, 2, 2, 2], args.output_size, nf=int(args.width_mult * 64))
     else:
         raise NotImplementedError()
+
+def GEMResNet18CSI_B50():
+    if args.dataset == 'cifar100' or args.dataset == 'timgnet':
+        return RN(BasicBlock, [2, 2, 2, 2], 50, nf=int(args.width_mult * 128))
+    elif args.dataset == 'cifar10':
+        return RN(BasicBlock, [2, 2, 2, 2], args.output_size, nf=int(args.width_mult * 64))
+    else:
+        raise NotImplementedError()

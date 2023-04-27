@@ -854,7 +854,103 @@ class RandSplitCIFAR10CSI:
         self.train_loader = self.loaders[i][0]
         self.val_loader = self.loaders[i][1]
         self.cal_loader = self.loaders[i][2]
+        
+class RandSplitCIFAR100_B50:
+    def __init__(self):
+        super(RandSplitCIFAR100_B50, self).__init__()
+        data_root = args.data
+        num_cls = args.output_size
+        use_cuda = torch.cuda.is_available()
+        train_dataset = datasets.CIFAR100(
+            root=data_root,
+            train=True,
+            download=True,
+            transform=transforms.Compose(
+                [
+                    transforms.ToTensor(),
+                ]
+            ),
+        )
+        val_dataset = datasets.CIFAR100(
+            root=data_root,
+            train=False,
+            download=True,
+            transform=transforms.Compose([
+                transforms.ToTensor(), 
+                # normalize
+                ]),
+        )
 
+        np.random.seed(args.seed)
+        perm = np.arange(args.total_cls)
+        # perm = np.array([80, 79, 25, 15, 39, 40, 53, 17, 57, 50, 
+        #  18, 69, 87, 16, 47, 3, 38, 52, 8, 34, 44, 72, 
+        #  59, 91, 98, 14, 21, 12, 58, 82, 95, 86, 76, 54, 
+        #  90, 42, 32, 23, 37, 62, 9, 1, 45, 75, 55, 81, 
+        #  92, 99, 36, 56, 13, 46, 27, 24, 28, 65, 7, 88, 
+        #  61, 97, 77, 73, 63, 29, 0, 51, 10, 74, 67, 66, 60, 
+        #  84, 85, 30, 89, 19, 83, 64, 41, 49, 31, 43, 20, 
+        #  6, 26, 35, 78, 68, 71, 2, 5, 22, 93, 70, 4, 
+        #  94, 33, 11, 96, 48])
+        # print(perm)
+        base = 50
+        splits =[]
+        for i in range(args.num_tasks):
+            if i == 0:
+                splits.append(
+                    (
+                    partition_datasetv4_csi(train_dataset, perm[0 : base], train=True, cal=False, val=False, prop=0.9) if args.validation \
+                        else partition_datasetv4_csi(train_dataset, perm[0 : base], train=True, cal=False),
+                    partition_datasetv4_csi(train_dataset, perm[0 : base], train=True, cal=False, val=True, prop=0.9) if args.validation \
+                        else partition_datasetv4_csi(val_dataset, perm[0 : base], train=False, cal=False),
+                    partition_datasetv4_csi(train_dataset, perm[0 : base], train=True, cal=True, val=False, prop=0.9) if args.validation \
+                        else partition_datasetv4_csi(train_dataset, perm[0 : base], train=True, cal=True),
+                ))
+            else:
+                splits.append((
+                    partition_datasetv4_csi(train_dataset, perm[base + (i-1) * num_cls : base + i * num_cls], train=True, cal=False, val=False, prop=0.9) if args.validation \
+                        else partition_datasetv4_csi(train_dataset, perm[base + (i-1) * num_cls : base + i * num_cls], train=True, cal=False),
+                    partition_datasetv4_csi(train_dataset, perm[base + (i-1) * num_cls : base + i * num_cls], train=True, cal=False, val=True, prop=0.9) if args.validation \
+                        else partition_datasetv4_csi(val_dataset, perm[base + (i-1) * num_cls : base + i * num_cls], train=False, cal=False),
+                    partition_datasetv4_csi(train_dataset, perm[base + (i-1) * num_cls : base + i * num_cls], train=True, cal=True, val=False, prop=0.9) if args.validation \
+                        else partition_datasetv4_csi(train_dataset, perm[base + (i-1) * num_cls : base + i * num_cls], train=True, cal=True),
+                ))
+                
+
+        for i in range(args.num_tasks):
+            if i == 0:
+                splits[i][0].targets = np.array(splits[i][0].targets)
+                splits[i][1].targets = np.array(splits[i][1].targets)
+                splits[i][2].targets = np.array(splits[i][2].targets)
+            else:
+                splits[i][0].targets = np.array(splits[i][0].targets)% num_cls
+                splits[i][1].targets = np.array(splits[i][1].targets)% num_cls
+                splits[i][2].targets = np.array(splits[i][2].targets)% num_cls
+        
+        # [print(perm[num_cls * i:num_cls * (i+1)]) for i in range(args.num_tasks)]
+
+        kwargs = {"num_workers": args.workers, "pin_memory": True} if use_cuda else {}
+
+        self.loaders = [
+            (
+                torch.utils.data.DataLoader(
+                    x[0], batch_size=args.batch_size, shuffle=True, **kwargs
+                ),
+                torch.utils.data.DataLoader(
+                    x[1], batch_size=args.test_batch_size, shuffle=True, **kwargs
+                ),
+                torch.utils.data.DataLoader(
+                    x[2], batch_size=args.cal_batch_size, shuffle=True, **kwargs
+                ),
+            )
+            for x in splits
+        ]
+
+    def update_task(self, i):
+        self.train_loader = self.loaders[i][0]
+        self.val_loader = self.loaders[i][1]
+        self.cal_loader = self.loaders[i][2]
+        
 class RandSplitCIFAR100CSI:
     def __init__(self):
         super(RandSplitCIFAR100CSI, self).__init__()
